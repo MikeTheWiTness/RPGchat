@@ -38,6 +38,7 @@ class OpenAIProvider(LLMProvider):
             model=self._model,
             messages=messages,
             stream=False,
+            timeout=120,
             reasoning_effort=self._reasoning_effort,
             extra_body={"thinking": {"type": "enabled"}},
         )
