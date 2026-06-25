@@ -239,10 +239,10 @@ class TestGameLoop:
         )
         gl.new_game(
             "测试", "世界", pc,
-            mechanics_mode="light-rules", rules_system="coc",
+            mechanics_mode="light-rules", rules_system="d20",
         )
         output = gl.handle_input("{检定 侦查}")
-        assert "d100=" in output
+        assert "d20=" in output
         assert "侦查" in output
 
     def test_handle_skill_check_pure_narrative(self, loop):

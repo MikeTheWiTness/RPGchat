@@ -289,17 +289,13 @@ def _new_game(engine, cs, st, ca, config):
 
     print("\n选择规则系统：")
     print("  1. 纯叙事模式（推荐）")
-    print("  2. CoC 7th 规则")
-    print("  3. D&D 5e 规则")
+    print("  2. 轻量规则（d20）")
     rules_choice = input("\n> ").strip()
     mechanics = "pure-narrative"
     rules_system = ""
     if rules_choice == "2":
         mechanics = "light-rules"
-        rules_system = "coc"
-    elif rules_choice == "3":
-        mechanics = "light-rules"
-        rules_system = "dnd"
+        rules_system = "d20"
 
     print("\n正在生成初始场景...\n")
     output = engine.new_game(
