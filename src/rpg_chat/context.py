@@ -19,9 +19,75 @@ class ContextAssembler:
         self._environment_store = environment_store
         self._scene_tracker = scene_tracker
         self._campaign_background: Optional[CampaignBackground] = None
+        self._director_intents: list[str] = []
+        self._plot_context: str = ""
 
     def set_campaign_background(self, bg: CampaignBackground):
         self._campaign_background = bg
+
+    def set_director_intents(self, intents: list[str]):
+        self._director_intents = list(intents)
+
+    def set_plot_context(self, text: str):
+        self._plot_context = text
+
+    def _build_campaign_summary(self, max_setting: int = 500) -> str:
+        """构建战役上下文摘要，纳入所有结构化字段。"""
+        if not self._campaign_background:
+            return ""
+        cb = self._campaign_background
+        parts = []
+
+        parts.append(f"世界设定: {cb.world_setting[:max_setting]}")
+
+        scene = cb.current_scene or cb.initial_situation
+        if scene:
+            parts.append(f"当前场景: {scene}")
+
+        if cb.factions:
+            faction_lines = [
+                f"  - {f.get('name', '?')}: {f.get('description', '')[:100]}"
+                for f in cb.factions
+            ]
+            parts.append("势力:\n" + "\n".join(faction_lines))
+
+        if cb.history:
+            hist_lines = [
+                f"  - {h.get('period', '?')}: {h.get('event', '')[:100]}"
+                for h in cb.history
+            ]
+            parts.append("历史:\n" + "\n".join(hist_lines))
+
+        if cb.important_locations:
+            loc_lines = [
+                f"  - {l.get('name', '?')}: {l.get('description', '')[:100]}"
+                for l in cb.important_locations
+            ]
+            parts.append("重要地点:\n" + "\n".join(loc_lines))
+
+        if cb.pc_role and cb.pc_role.strip():
+            parts.append(f"主角定位: {cb.pc_role}")
+
+        if cb.mission and cb.mission.strip():
+            parts.append(f"核心任务: {cb.mission}")
+
+        if cb.party:
+            party_lines = [
+                f"  - {m.get('name', '?')}: {m.get('role', '')} — {m.get('description', '')}"
+                for m in cb.party
+            ]
+            parts.append("主角团:\n" + "\n".join(party_lines))
+
+        # 导演意图（无玩家模式）
+        if self._director_intents:
+            intent_str = "\n".join(f"  {i+1}. {text}" for i, text in enumerate(self._director_intents))
+            parts.append(f"【导演意图 — 后续剧情方向必须遵循以下指引】\n{intent_str}")
+
+        # 剧情大纲当前章节
+        if self._plot_context:
+            parts.append(f"【当前剧情阶段】\n{self._plot_context}")
+
+        return "\n\n".join(parts)
 
     def assemble_for_character(self, character_id: str) -> dict:
         profile = self._character_store.get_profile(character_id)
@@ -43,12 +109,7 @@ class ContextAssembler:
         perceived_actions = self._get_perceived_actions(character_id)
         all_profiles = self._character_store.get_all_characters()
 
-        campaign_summary = ""
-        if self._campaign_background:
-            parts = [f"世界: {self._campaign_background.world_setting[:500]}"]
-            scene = self._campaign_background.current_scene or self._campaign_background.initial_situation
-            parts.append(f"当前场景: {scene}")
-            campaign_summary = "\n".join(parts)
+        campaign_summary = self._build_campaign_summary(max_setting=400)
 
         return {
             "profile": profile,
@@ -98,12 +159,7 @@ class ContextAssembler:
 
         present = self._scene_tracker.get_present()
 
-        campaign_summary = ""
-        if self._campaign_background:
-            parts = [f"世界: {self._campaign_background.world_setting[:1000]}"]
-            scene = self._campaign_background.current_scene or self._campaign_background.initial_situation
-            parts.append(f"当前场景: {scene}")
-            campaign_summary = "\n".join(parts)
+        campaign_summary = self._build_campaign_summary(max_setting=800)
 
         return {
             "all_profiles": all_profiles,

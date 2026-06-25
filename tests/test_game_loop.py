@@ -23,6 +23,7 @@ class TestGameLoop:
             max_consecutive_characters=5,
             sanity_check_interval=10,
             auto_chain_enabled=False,
+            env_force_lambda=0.0,
         )
         gl = GameLoop(gateway, cs, dl, es, st, ca, config)
         return gl, provider
@@ -107,9 +108,6 @@ class TestGameLoop:
                         "force_environment": False, "corrected_present_characters": None}),
             json.dumps({"character_id": "npc_bob", "dialogue": "欢迎来到酒馆",
                         "action": "挥手", "inner_thought": "新来的冒险者"}),
-            json.dumps({"character_id": "npc_bob", "dialogue": None,
-                        "action": "他笑着挥了挥手，掌心的老茧在烛光下清晰可见。",
-                        "inner_thought": None}),
             json.dumps({"next_speaker": "pc_alice", "reason": "轮到PC",
                         "force_environment": False, "corrected_present_characters": None}),
         ])
@@ -315,6 +313,7 @@ class TestGameLoopConfirmation:
             max_consecutive_characters=5,
             sanity_check_interval=10,
             auto_chain_enabled=False,
+            env_force_lambda=0.0,
         )
         gl = GameLoop(gateway, cs, dl, es, st, ca, config)
         return gl, provider
@@ -412,6 +411,7 @@ class TestPlayerAbsentMode:
             max_consecutive_characters=5,
             sanity_check_interval=10,
             auto_chain_enabled=False,
+            env_force_lambda=0.0,
         )
         gl = GameLoop(gateway, cs, dl, es, st, ca, config)
         return gl, provider
@@ -588,6 +588,7 @@ class TestCheckEmbeddedInNarrative:
             max_consecutive_characters=5,
             sanity_check_interval=10,
             auto_chain_enabled=False,
+            env_force_lambda=0.0,
         )
         gl = GameLoop(gateway, cs, dl, es, st, ca, config)
         return gl, provider
@@ -721,6 +722,7 @@ class TestModuleGameStart:
             max_consecutive_characters=5,
             sanity_check_interval=10,
             auto_chain_enabled=False,
+            env_force_lambda=0.0,
         )
         gl = GameLoop(gateway, cs, dl, es, st, ca, config)
         return gl, provider
@@ -812,6 +814,7 @@ class TestCheckpointSystem:
             max_consecutive_characters=5,
             sanity_check_interval=10,
             auto_chain_enabled=False,
+            env_force_lambda=0.0,
         )
         gl = GameLoop(gateway, cs, dl, es, st, ca, config)
         return gl, provider
@@ -942,6 +945,7 @@ class TestModifyCharacter:
             max_consecutive_characters=5,
             sanity_check_interval=10,
             auto_chain_enabled=False,
+            env_force_lambda=0.0,
         )
         gl = GameLoop(gateway, cs, dl, es, st, ca, config)
         return gl, provider, cs

@@ -20,7 +20,7 @@ class TestAutoMode:
         es = EnvironmentStore()
         st = SceneTracker()
         ca = ContextAssembler(cs, dl, es, st)
-        config = GameLoopConfig(auto_chain_enabled=False)
+        config = GameLoopConfig(auto_chain_enabled=False, env_force_lambda=0.0)
         gl = GameLoop(gateway, cs, dl, es, st, ca, config)
         return gl, provider
 

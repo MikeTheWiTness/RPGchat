@@ -88,7 +88,7 @@ class TestE2EGameFlow:
         es = EnvironmentStore()
         st = SceneTracker()
         ca = ContextAssembler(cs, dl, es, st)
-        config = GameLoopConfig(auto_chain_enabled=False)
+        config = GameLoopConfig(auto_chain_enabled=False, env_force_lambda=0.0)
         gl = GameLoop(gateway, cs, dl, es, st, ca, config)
         return gl, provider
 
@@ -110,15 +110,11 @@ class TestE2EGameFlow:
             # 酒馆老板发言 + 动作
             _make_npc_au("npc_bartender", dialogue="欢迎来到海风酒馆！要来一杯吗？",
                          action="擦拭着吧台"),
-            # 酒馆老板的动作结果
-            _make_action_result("吧台在烛光下泛着温润的光泽，几滴冷凝水顺着杯壁滑落。"),
             _make_judgment("npc_merchant", "商人从角落打量来客"),
 
             # 商人发言 + 动作
             _make_npc_au("npc_merchant", dialogue="那边的冒险者，有兴趣谈笔生意吗？",
                          action="从角落站起身"),
-            # 商人的动作结果
-            _make_action_result("商人站起身时斗篷滑落，露出腰间鼓鼓的钱袋和一把精致的匕首。"),
             _make_judgment("pc_main", "PC应该回应商人的邀约"),
         ])
 

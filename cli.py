@@ -201,9 +201,17 @@ def _new_game(engine, cs, st, ca, config):
         if not modules:
             print("\n[系统] 没有可用的模组。请在 presets/modules/ 放入模组文件夹。")
             return
+        from rpg_chat.preset_loader import load_module as _load_mod
         print("\n可用模组：")
         for i, m in enumerate(modules, 1):
-            print(f"  {i}. {m}")
+            mod_data = _load_mod(m)
+            desc = ""
+            if mod_data:
+                desc = mod_data.get("description", "")
+                if not desc:
+                    desc = mod_data.get("initial_situation", "")
+            desc_text = f" — {desc[:60]}{'...' if len(desc) > 60 else ''}" if desc else ""
+            print(f"  {i}. {m}{desc_text}")
         m_choice = input("\n输入模组序号: ").strip()
         try:
             idx = int(m_choice) - 1
@@ -219,18 +227,81 @@ def _new_game(engine, cs, st, ca, config):
         absent_mode = mode_choice == "2"
 
         if absent_mode:
-            print("\n━━━ 玩家空缺模式 ━━━")
-            print("故事将自动推演，你以导演视角参与。")
-            print("随时可输入自由文本作为环境描述来干预剧情，或使用 {} 指令。")
-            print("\n正在加载模组并生成初始场景...\n")
+            # 加载模组数据展示信息
+            from rpg_chat.preset_loader import load_module as _lm
+            mod = _lm(module_name)
+            if mod:
+                desc = mod.get("description", "")
+                mission = mod.get("world").mission if mod.get("world") else ""
+                pc_role = mod.get("world").pc_role if mod.get("world") else ""
+                party = mod.get("world").party if mod.get("world") else []
+                print(f"\n━━━ 玩家空缺模式 ━━━")
+                print(f"📋 模组：{module_name}")
+                if desc:
+                    print(f"   {desc}")
+                if pc_role:
+                    print(f"👤 主角定位：{pc_role}")
+                if party:
+                    names = [f"{m.get('name', '?')}({m.get('role', '')})" for m in party]
+                    print(f"👥 团队：{', '.join(names)}")
+                if mission:
+                    print(f"🎯 任务：{mission}")
+                # 展示默认大纲
+                po = mod.get("plot_outline")
+                if po and po.chapters:
+                    print(f"\n📜 默认大纲：{po.title}")
+                    for c in po.chapters:
+                        print(f"   · {c.title}")
+                print("\n故事将自动推演，你以导演视角参与。")
+                print("输入自由文本即可改变剧情方向（将作为导演意图生效）。")
+                print("指令: {继续} {保存} {查看意图} {清除意图} {查看在场} {检查点} {大纲} {设定大纲 ...}")
+                print("\n按回车开始；或输入自定义内容后开始——")
+                print("  · 普通文本 → 作为初始导演意图")
+                print("  · 以「大纲：」开头 → 覆盖默认大纲（解析为章节式）")
+                custom = input("\n> ").strip()
+            else:
+                print("\n━━━ 玩家空缺模式 ━━━")
+                print("故事将自动推演，你以导演视角参与。")
+                print("随时可输入自由文本作为环境描述来干预剧情，或使用 {} 指令。")
+                print("\n正在加载模组并生成初始场景...\n")
+                custom = ""
+
+            custom_outline_text = ""
+            custom_intent = ""
+            if custom and not custom.startswith("{"):
+                if custom.startswith("大纲：") or custom.startswith("大纲:"):
+                    custom_outline_text = custom[3:].lstrip("：:").strip()
+                else:
+                    custom_intent = custom
+
             output = engine.new_game_with_module(
                 name=f"{module_name}-空缺",
                 module_name=module_name,
+                custom_outline_text=custom_outline_text,
             )
+            # 游戏创建后再写入自定义导演意图
+            if custom_intent:
+                engine._session.director_intents.append(custom_intent)
+                engine._sync_director_intents_to_context()
             print(output)
             return
 
         pc = _create_pc_profile(module_name)
+
+        # 展示模组信息
+        from rpg_chat.preset_loader import load_module as _lm2
+        mod = _lm2(module_name)
+        if mod:
+            desc = mod.get("description", "")
+            mission = mod.get("world").mission if mod.get("world") else ""
+            party = mod.get("world").party if mod.get("world") else []
+            if desc:
+                print(f"\n📋 {module_name}: {desc}")
+            if party:
+                names = [f"{m.get('name', '?')}({m.get('role', '')})" for m in party]
+                print(f"👥 同行者: {', '.join(names)}")
+            if mission:
+                print(f"🎯 任务: {mission}")
 
         print("\n正在加载模组并生成初始场景...\n")
         output = engine.new_game_with_module(
@@ -352,6 +423,8 @@ def _game_loop(engine):
         print("  {列出角色预设}     — 查看可导入的角色")
         print("  {列出世界观预设}   — 查看可导入的世界观")
         print("  {列出模组}       — 查看可用的模组")
+        print("  {历史}           — 查看动作记录")
+        print("  {回滚 N}         — 回退到第 N 条记录之前")
     else:
         print("━ 输入格式:")
         print('  【对话】        — 角色发言（支持多个【】标记）')
@@ -368,6 +441,14 @@ def _game_loop(engine):
         print('  {列出角色预设}     — 查看可导入的角色')
         print('  {列出世界观预设}   — 查看可导入的世界观')
         print('  {列出模组}       — 查看可用的模组')
+        print('  {历史}           — 查看动作记录')
+        print('  {回滚 N}         — 回退到第 N 条记录之前')
+        print('  {大纲}           — 查看当前剧情大纲')
+        print('  {设定大纲 ...}   — 覆盖剧情大纲')
+        if engine._session and engine._session.mode == "player-absent":
+            print('  {查看意图}       — 查看当前导演意图')
+            print('  {清除意图}       — 清除所有导演意图')
+            print('  {意图 N}         — 删除第 N 条意图')
     print("  /help            — 显示帮助")
     print("  /quit            — 退出游戏")
     print("═" * 50 + "\n")
@@ -400,7 +481,16 @@ def _game_loop(engine):
             pass  # 指令类不需要思考提示
         else:
             print("⏳ 思考中...", end="", flush=True)
-        response = engine.handle_input(user_input, on_step=lambda sp, txt: print(f"\n{txt}", flush=True))
+        try:
+            response = engine.handle_input(user_input, on_step=lambda sp, txt: print(f"\n{txt}", flush=True))
+        except Exception as e:
+            # 识别 LLM 超时，给友好提示
+            if "LLMTimeoutError" in type(e).__name__ or "timeout" in str(e).lower():
+                print(f"\n⏱️ 响应超时，已中断本轮生成。可重新输入或用 {{继续}} 重试。")
+            else:
+                print(f"\n[系统] 处理输入时出错: {e}")
+                print("[系统] 游戏继续，可重新输入。")
+            continue
 
 
 def _show_help():

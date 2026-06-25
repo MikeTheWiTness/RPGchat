@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from rpg_chat.types import CharacterProfile, CampaignBackground
+from rpg_chat.types import CharacterProfile, CampaignBackground, PlotOutline, PlotChapter, PlotEvent
 
 
 _PRESETS_DIR = Path(__file__).parent.parent.parent / "presets"
@@ -89,6 +89,9 @@ def _load_world_from_file(path: Path) -> CampaignBackground:
         history=data.get("history", []),
         important_locations=data.get("important_locations", []),
         initial_situation=data.get("initial_situation", ""),
+        pc_role=data.get("pc_role", ""),
+        party=data.get("party", []),
+        mission=data.get("mission", ""),
     )
 
 
@@ -133,6 +136,36 @@ def build_pc_from_preset(
     return profile
 
 
+def build_plot_outline_from_dict(po_data: dict) -> PlotOutline | None:
+    """从 dict 构建 PlotOutline，供模组加载和运行时自定义大纲复用。"""
+    if not po_data:
+        return None
+    chapters = []
+    for ch_data in po_data.get("chapters", []):
+        events = []
+        for ev_data in ch_data.get("key_events", []):
+            events.append(PlotEvent(
+                id=ev_data.get("id", ""),
+                description=ev_data.get("description", ""),
+                trigger=ev_data.get("trigger", ""),
+                is_key=ev_data.get("is_key", False),
+            ))
+        chapters.append(PlotChapter(
+            id=ch_data.get("id", ""),
+            title=ch_data.get("title", ""),
+            summary=ch_data.get("summary", ""),
+            key_events=events,
+            clues=ch_data.get("clues", []),
+            possible_transitions=ch_data.get("possible_transitions", []),
+        ))
+    return PlotOutline(
+        title=po_data.get("title", ""),
+        summary=po_data.get("summary", ""),
+        chapters=chapters,
+        possible_endings=po_data.get("possible_endings", []),
+    )
+
+
 def load_module(name_or_path: str) -> Optional[dict]:
     path = Path(name_or_path)
     if not path.is_absolute():
@@ -160,10 +193,26 @@ def load_module(name_or_path: str) -> Optional[dict]:
             characters.append(_load_character_from_file(char_file))
 
     initial_situation = data.get("initial_situation", "")
+    pc_role = data.get("pc_role", "")
+    party = data.get("party", [])
+    mission = data.get("mission", "")
+    description = data.get("description", "")
+    mechanics_mode = data.get("mechanics_mode", "")
+    rules_system = data.get("rules_system", "")
+
+    world.pc_role = pc_role or world.pc_role
+    world.party = party or world.party
+    world.mission = mission or world.mission
+
+    plot_outline = build_plot_outline_from_dict(data.get("plot_outline"))
 
     return {
         "name": module_name,
+        "description": description,
         "world": world,
         "characters": characters,
         "initial_situation": initial_situation,
+        "mechanics_mode": mechanics_mode,
+        "rules_system": rules_system,
+        "plot_outline": plot_outline,
     }

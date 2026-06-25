@@ -1,5 +1,5 @@
 from rpg_chat.types import ActionUnit, CharacterContext, CharacterProfile
-
+import copy as _copy
 
 class CharacterStore:
     def __init__(self):
@@ -51,3 +51,9 @@ class CharacterStore:
         )
         self.create_character(profile)
         return profile
+
+    def snapshot_contexts(self) -> dict[str, CharacterContext]:
+        return _copy.deepcopy(self._contexts)
+
+    def restore_contexts(self, data: dict[str, CharacterContext]):
+        self._contexts = _copy.deepcopy(data)

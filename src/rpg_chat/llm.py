@@ -1,12 +1,28 @@
 import json
 import logging
 import os
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from rpg_chat.types import ActionUnit, CharacterProfile
 from rpg_chat.parser import validate_action_unit_json, ParseError
 from rpg_chat.fortune import FortuneLevel, FortuneSystem
+
+
+def _extract_json(raw: str) -> str:
+    """从 LLM 返回里提取 JSON 文本：剥掉 markdown 代码块、前后多余文字。"""
+    text = raw.strip()
+    # 剥 markdown 代码块
+    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
+    if fence:
+        text = fence.group(1).strip()
+    # 找第一个 { 到最后一个 } 之间的内容
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        text = text[start:end + 1]
+    return text
 
 
 GLOBAL_SYSTEM_PROMPT = """【系统限制】
@@ -89,23 +105,6 @@ class LLMGateway:
             f"NPC 动作单元生成失败（已重试 {self.MAX_RETRIES} 次）: {last_error}"
         )
 
-    def generate_npc_action_result(self, context: dict, last_action: str) -> ActionUnit:
-        """NPC 刚执行了动作，描述 NPC 感知到的结果（仅 action 字段）"""
-        name = context.get("profile").name if context.get("profile") else "角色"
-        prompt = self._build_npc_action_result_prompt(name, last_action)
-        last_error = None
-        for attempt in range(self.MAX_RETRIES + 1):
-            try:
-                raw = self._complete(prompt)
-                return validate_action_unit_json(raw)
-            except (ParseError, json.JSONDecodeError) as e:
-                last_error = e
-                if attempt < self.MAX_RETRIES:
-                    prompt = self._build_retry_prompt(prompt, str(e))
-        raise ParseError(
-            f"NPC 动作结果生成失败（已重试 {self.MAX_RETRIES} 次）: {last_error}"
-        )
-
     def generate_pc_action_result(self, action: str, campaign: str) -> ActionUnit:
         """PC 刚执行了动作，GM 助手描述客观结果（仅 action 字段）"""
         prompt = self._build_pc_action_result_prompt(action, campaign)
@@ -180,14 +179,22 @@ class LLMGateway:
         prompt = self._build_judgment_prompt(
             context, force_env_check, sanity_check
         )
-        raw = self._complete(prompt)
+        last_error = None
+        result = None
+        for attempt in range(self.MAX_RETRIES + 1):
+            raw = self._complete(prompt)
+            try:
+                result = json.loads(_extract_json(raw))
+                break
+            except json.JSONDecodeError as e:
+                last_error = e
+                if attempt < self.MAX_RETRIES:
+                    prompt = self._build_retry_prompt(prompt, str(e))
 
-        try:
-            result = json.loads(raw)
-        except json.JSONDecodeError:
+        if result is None:
             return {
                 "next_speaker": "environment",
-                "reason": "解析失败，默认回退到环境",
+                "reason": f"解析失败，默认回退到环境（已重试 {self.MAX_RETRIES} 次）",
                 "force_environment": False,
                 "corrected_present_characters": None,
             }
@@ -346,6 +353,45 @@ class LLMGateway:
                 "history": [],
                 "important_locations": [],
                 "initial_situation": "",
+            }
+
+    def build_plot_outline_from_text(self, text: str) -> dict:
+        """把自然语言剧情描述解析为结构化大纲 JSON。"""
+        prompt = f"""请将以下剧情描述解析为结构化的章节式大纲，返回 JSON 格式。
+
+剧情描述：
+{text}
+
+返回格式：
+{{
+  "title": "大纲标题",
+  "summary": "整体概要",
+  "chapters": [
+    {{
+      "id": "英文id",
+      "title": "章节标题",
+      "summary": "章节概要",
+      "key_events": [{{"id": "事件id", "description": "事件描述", "trigger": "触发条件", "is_key": true}}],
+      "clues": ["可发现的线索"],
+      "possible_transitions": ["可转向的下一章id"]
+    }}
+  ],
+  "possible_endings": ["可能的结局方向描述"]
+}}
+
+要求：
+- 至少 2 个章节，每章 1-3 个关键事件
+- id 用英文和下划线
+- 只返回 JSON，不要额外文字"""
+        raw = self._complete(prompt)
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return {
+                "title": "自定义大纲",
+                "summary": text[:200],
+                "chapters": [],
+                "possible_endings": [],
             }
 
     def _build_npc_prompt(self, context: dict) -> str:
@@ -556,14 +602,20 @@ class LLMGateway:
 你的历史行动:
 {units_str}
 
-请生成本角色的下一动作单元，返回 JSON:
-{{"character_id": "{profile.id if profile else ''}", "dialogue": "对话", "action": "行动", "inner_thought": "内心活动", "audience": ["可听到的角色id列表"], "entered": null, "left": null}}
+请生成本角色的下一动作单元，返回 JSON（字段填写实际内容，不要写占位符）:
+{{"character_id": "{profile.id if profile else ''}", "narrative": "连贯叙述全文", "audience": ["可听到的角色id列表"], "entered": null, "left": null}}
 
 要求:
-- dialogue/action/inner_thought 至少一项不为空
-- 对话和行动要符合角色性格、背景和身份
+- narrative 是一段连贯的角色叙述，包含动作、对话、内心活动的任意组合，至少有一项
+- 对话必须用中文双引号 "..." 包裹（不要用「」或单引号）
+- 内心活动必须用中文括号 （...） 包裹
+- 动作描写不要加任何标记，直接写在引号/括号之外
+- 动作描写中尽量少用"他/她/它/我"等人称代词，直接用角色名字或代号指代本角色和其他角色（例：用"佐佐木站起身"而非"他站起身"），避免指代不清
+- 对话和行动要符合角色性格、背景和身份，也要符合战役背景中的"当前剧情阶段"指引
 - 内心活动只有 GM 能看到
-- 口语化、日常化，不要使用不符合世界观的表达"""
+- 动作要写成完整的角色动作描述，包含动作本身 + 角色从中感知/观察到/发现的结果
+- 口语化、日常化，不要使用不符合世界观的表达
+- 不要在 narrative 里出现角色名字前缀（如 "[佐佐木] "），程序会自动添加"""
 
         return static_ctx, user_prompt
 
@@ -573,8 +625,18 @@ class LLMGateway:
         all_profiles = context.get("all_profiles", [])
         dialogue_history = context.get("public_dialogue_history", [])
         campaign = context.get("campaign_summary", "")
+        gm_hint = context.get("gm_hint", "")
 
-        env_str = "\n".join(e.description for e in all_env[-5:])
+        # 历史环境：用"较早的环境"（除最后一条）来给上下文；上一条单独标出防止重复
+        prev_env = all_env[-1].description if all_env else ""
+        prev_env_block = ""
+        if prev_env:
+            prev_env_block = (
+                f"\n【上一轮环境描述 — 你刚写完的，不要重复，要从这里继续推进】:\n{prev_env[:200]}\n"
+            )
+        older_envs = all_env[:-1][-4:]
+        env_str = "\n".join(e.description for e in older_envs) if older_envs else "无"
+
         dialogue_str = "\n".join(
             f"[{d.character_id}]: {d.dialogue}"
             for d in dialogue_history[-5:]
@@ -594,7 +656,8 @@ class LLMGateway:
 
         if is_initial:
             task_desc = (
-                "这是故事的开场。描写初始场景的氛围，引入在场人物，可以引入 1-2 个新 NPC 推动剧情。"
+                "这是故事的开场。根据战役背景中的主角定位、团队和任务，描写初始场景氛围，"
+                "引入在场人物，可以引入 1-2 个新 NPC 推动剧情。"
             )
             entered_hint = '["可选,新进入场景的角色id列表"]'
         else:
@@ -606,28 +669,36 @@ class LLMGateway:
                 "- 绝对不要替角色做任何事\n"
                 "- 可以用外部事件推进剧情（远处警笛、电话响起、停电、敲门声）\n"
                 "- 不要引入新 NPC\n"
-                "- entered 字段留空"
+                "- entered 字段留空\n"
+                "- 绝对不要重复上一轮已经写过的内容——必须推进变化，而非换一种写法再写一遍同样的元素"
             )
             entered_hint = '[]'
+
+        gm_hint_block = ""
+        if gm_hint:
+            gm_hint_block = (
+                f"\n【GM 创作指引 — 由判定机制提供，请在此场景叙述中体现】\n{gm_hint}\n"
+            )
 
         return f"""你是 TRPG 场景叙述者。
 
 当前在场人物: {', '.join(present_names) if present_names else '无'}
 {campaign_hint}
-最近的环境描述（不要重复）:
+较早的环境描述:
 {env_str}
-
+{prev_env_block}
 最近的对话（仅供参考氛围）:
 {dialogue_str}
-
+{gm_hint_block}
 {task_desc}
 要求：
 - 使用感官细节：视觉、听觉、嗅觉、触觉
 - 100-200 字中文
 - 客观描述，不要替角色做任何事
+- 若有 GM 创作指引，用环境变化（光线、声音、天气、突发事件）来呼应其暗示，不要直接复述指引文字
 
-返回 JSON:
-{{"character_id": null, "dialogue": null, "action": "场景叙述", "inner_thought": null, "audience": [{', '.join(f'"{p}"' for p in present)}], "entered": {entered_hint}, "left": null}}
+返回 JSON（action 字段填写你写的场景叙述全文，不要写成占位符）:
+{{"character_id": null, "dialogue": null, "action": "在这里写入场景叙述的完整内容", "inner_thought": null, "audience": [{', '.join(f'"{p}"' for p in present)}], "entered": {entered_hint}, "left": null}}
 
 只返回 JSON，不要额外文字。"""
 
@@ -670,9 +741,7 @@ class LLMGateway:
                 "\n注意：只能使用已知角色 ID，不要编造新 ID"
             )
 
-        campaign_hint = f"\n战役背景: {campaign[:300]}" if campaign else ""
-
-        # 可选的 next_speaker = 在场角色 + environment，不能是未知 ID
+        campaign_hint = f"\n战役背景（作为判断依据，注意其中的剧情阶段/导演意图）:\n{campaign[:500]}" if campaign else ""
         valid_speakers = present + ["environment"]
 
         return f"""作为 GM，判断接下来由谁发言/行动。
@@ -707,18 +776,6 @@ next_speaker 只能从以下选择: {', '.join(valid_speakers)}
 
 返回 JSON:
 {{"id": "npc_id", "name": "{name}", "personality": "性格描述", "background": "背景故事", "appearance": "外貌描述", "skills": {{}}, "relationships": {{}}, "notes": "", "physique": {{"height": "", "weight": "", "build": "", "measurements": ""}}, "identity": {{"occupation": "", "social_status": "", "affiliations": ""}}, "clothing": "服饰描述", "behavior": {{"habits": "", "quirks": "", "mannerisms": ""}}, "intimate_features": ""}}"""
-
-    def _build_npc_action_result_prompt(self, name: str, last_action: str) -> str:
-        return f"""你是 TRPG 角色 "{name}"。
-你刚才执行了以下动作：{last_action}
-
-请描述你从这个动作中感知/发现/观察到了什么。只输出行动字段（action），不要对话和内心活动。
-用 50-150 字中文描述，保持角色视角。
-
-返回 JSON:
-{{"character_id": null, "dialogue": null, "action": "你观察到的结果", "inner_thought": null}}
-
-只返回 JSON，不要额外文字。"""
 
     def _build_pc_action_result_prompt(self, action: str, campaign: str) -> str:
         campaign_hint = f"\n战役背景: {campaign[:300]}" if campaign else ""

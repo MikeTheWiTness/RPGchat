@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+import copy as _copy
 
 from rpg_chat.types import DialogueEntry, EnvironmentEntry
 
@@ -21,6 +22,12 @@ class DialogueLog:
 
     def history(self) -> list[DialogueEntry]:
         return list(self._entries)
+
+    def snapshot_entries(self) -> list[DialogueEntry]:
+        return _copy.deepcopy(self._entries)
+
+    def restore_entries(self, data: list[DialogueEntry]):
+        self._entries = _copy.deepcopy(data)
 
 
 class EnvironmentStore:
@@ -71,3 +78,9 @@ class EnvironmentStore:
         removed = self._entries[:-keep]
         self._entries = self._entries[-keep:]
         return removed
+
+    def snapshot_entries(self) -> list[EnvironmentEntry]:
+        return _copy.deepcopy(self._entries)
+
+    def restore_entries(self, data: list[EnvironmentEntry]):
+        self._entries = _copy.deepcopy(data)

@@ -76,6 +76,7 @@ class SceneState:
     present_characters: list[str] = field(default_factory=list)
     action_count_since_env: int = 0
     total_action_count: int = 0
+    consecutive_env_count: int = 0
 
 
 @dataclass
@@ -115,6 +116,35 @@ class CampaignBackground:
     important_locations: list[dict] = field(default_factory=list)
     initial_situation: str = ""
     current_scene: str = ""
+    pc_role: str = ""
+    party: list[dict] = field(default_factory=list)
+    mission: str = ""
+
+
+@dataclass
+class PlotEvent:
+    id: str
+    description: str
+    trigger: str = ""
+    is_key: bool = False
+
+
+@dataclass
+class PlotChapter:
+    id: str
+    title: str
+    summary: str = ""
+    key_events: list[PlotEvent] = field(default_factory=list)
+    clues: list[str] = field(default_factory=list)
+    possible_transitions: list[str] = field(default_factory=list)
+
+
+@dataclass
+class PlotOutline:
+    title: str = ""
+    summary: str = ""
+    chapters: list[PlotChapter] = field(default_factory=list)
+    possible_endings: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -131,6 +161,8 @@ class GameSession:
     scene_state: SceneState = field(default_factory=SceneState)
     checkpoints: list[CheckpointSummary] = field(default_factory=list)
     rules_config: RulesConfig | None = None
+    director_intents: list[str] = field(default_factory=list)
+    plot_outline: PlotOutline | None = None
     created_at: str = ""
     updated_at: str = ""
 
@@ -139,3 +171,16 @@ class GameSession:
 class AgentDirective:
     content: str
     timestamp: str = ""
+
+
+@dataclass
+class Snapshot:
+    sequence: int
+    description: str
+    character_contexts: dict = field(default_factory=dict)
+    environment_entries: list = field(default_factory=list)
+    dialogue_log: list = field(default_factory=list)
+    scene_state: SceneState = field(default_factory=SceneState)
+    last_judgment: JudgmentResult | None = None
+    director_intents: list[str] = field(default_factory=list)
+    plot_tracker_state: dict | None = None

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh issue *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'docs: ADR-0004 narrative输出 + PRD整理 + Memory初始化 *)"
+    ]
+  }
+}

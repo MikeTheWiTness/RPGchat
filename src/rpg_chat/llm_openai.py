@@ -1,7 +1,12 @@
 import os
-from openai import OpenAI
+from openai import OpenAI, APITimeoutError, APIConnectionError
 
 from rpg_chat.llm import LLMProvider
+
+
+class LLMTimeoutError(Exception):
+    """LLM 调用超时或连接失败，用于上层友好兜底。"""
+    pass
 
 
 class OpenAIProvider(LLMProvider):
@@ -11,6 +16,7 @@ class OpenAIProvider(LLMProvider):
         base_url: str | None = None,
         model: str | None = None,
         reasoning_effort: str | None = None,
+        timeout: int | None = None,
     ):
         self._api_key = api_key or os.environ.get("DEEPSEEK_API_KEY", "")
         self._base_url = base_url or "https://api.deepseek.com"
@@ -18,6 +24,7 @@ class OpenAIProvider(LLMProvider):
         self._reasoning_effort = reasoning_effort or os.environ.get(
             "DEEPSEEK_REASONING_EFFORT", "high"
         )
+        self._timeout = timeout or int(os.environ.get("DEEPSEEK_TIMEOUT", "120") or 120)
 
         self._client = OpenAI(
             api_key=self._api_key,
@@ -34,12 +41,15 @@ class OpenAIProvider(LLMProvider):
         messages.append({"role": "system", "content": system_content})
         messages.append({"role": "user", "content": prompt})
 
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=messages,
-            stream=False,
-            timeout=120,
-            reasoning_effort=self._reasoning_effort,
-            extra_body={"thinking": {"type": "enabled"}},
-        )
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=messages,
+                stream=False,
+                timeout=self._timeout,
+                reasoning_effort=self._reasoning_effort,
+                extra_body={"thinking": {"type": "enabled"}},
+            )
+        except (APITimeoutError, APIConnectionError) as e:
+            raise LLMTimeoutError(f"LLM 响应超时或连接失败: {e}") from e
         return response.choices[0].message.content
