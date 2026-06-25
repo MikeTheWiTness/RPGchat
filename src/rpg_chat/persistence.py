@@ -37,8 +37,13 @@ def save(session: GameSession, filepath: str | None = None):
         backup_path = path.with_suffix(".json.bak")
         path.replace(backup_path)
 
-    with open(path, "w", encoding="utf-8") as f:
+    tmp_path = path.with_suffix(".json.tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+
+    tmp_path.replace(path)
 
 
 def _deserialize_session(data: dict) -> GameSession:
@@ -91,6 +96,7 @@ def _deserialize_session(data: dict) -> GameSession:
         return CharacterContext(
             character_id=d.get("character_id", ""),
             action_units=[_make_au(au) for au in d.get("action_units", [])],
+            fortune=d.get("fortune", "normal"),
         )
 
     def _make_env_entry(d):
