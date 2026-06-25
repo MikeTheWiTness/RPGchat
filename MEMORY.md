@@ -1,0 +1,1 @@
+- [Grill 记录：Narrative 替换和架构演进](grill-narrative-replace.md) — 2026-06-26 grill-with-docs 会话记录，含变更清单、待实现项、ADR-0004
