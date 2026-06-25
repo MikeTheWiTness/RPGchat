@@ -1,16 +1,15 @@
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
 class ActionUnit:
-    character_id: Optional[str] = None
-    dialogue: Optional[str] = None
-    action: Optional[str] = None
-    inner_thought: Optional[str] = None
-    audience: Optional[list[str]] = None
-    entered: Optional[list[str]] = None
-    left: Optional[list[str]] = None
+    character_id: str | None = None
+    dialogue: str | None = None
+    action: str | None = None
+    inner_thought: str | None = None
+    audience: list[str] | None = None
+    entered: list[str] | None = None
+    left: list[str] | None = None
 
 
 @dataclass
@@ -18,7 +17,7 @@ class JudgmentResult:
     next_speaker: str
     reason: str
     force_environment: bool = False
-    corrected_present_characters: Optional[list[str]] = None
+    corrected_present_characters: list[str] | None = None
 
 
 @dataclass
@@ -94,7 +93,7 @@ class CheckResult:
     fumble: bool
     roll: DiceRollResult
     skill_value: int
-    difficulty: Optional[int] = None
+    difficulty: int | None = None
     result_description: str = ""
 
 
@@ -115,6 +114,7 @@ class CampaignBackground:
     history: list[dict] = field(default_factory=list)
     important_locations: list[dict] = field(default_factory=list)
     initial_situation: str = ""
+    current_scene: str = ""
 
 
 @dataclass
@@ -123,14 +123,14 @@ class GameSession:
     name: str
     mode: str = "player-present"
     mechanics_mode: str = "pure-narrative"
-    campaign_background: Optional[CampaignBackground] = None
+    campaign_background: CampaignBackground | None = None
     characters: dict[str, CharacterProfile] = field(default_factory=dict)
     character_contexts: dict[str, CharacterContext] = field(default_factory=dict)
     environment_entries: list[EnvironmentEntry] = field(default_factory=list)
     dialogue_log: list[DialogueEntry] = field(default_factory=list)
     scene_state: SceneState = field(default_factory=SceneState)
     checkpoints: list[CheckpointSummary] = field(default_factory=list)
-    rules_config: Optional[RulesConfig] = None
+    rules_config: RulesConfig | None = None
     created_at: str = ""
     updated_at: str = ""
 

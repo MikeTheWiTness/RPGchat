@@ -46,7 +46,8 @@ class ContextAssembler:
         campaign_summary = ""
         if self._campaign_background:
             parts = [f"世界: {self._campaign_background.world_setting[:500]}"]
-            parts.append(f"当前场景: {self._campaign_background.initial_situation}")
+            scene = self._campaign_background.current_scene or self._campaign_background.initial_situation
+            parts.append(f"当前场景: {scene}")
             campaign_summary = "\n".join(parts)
 
         return {
@@ -100,7 +101,8 @@ class ContextAssembler:
         campaign_summary = ""
         if self._campaign_background:
             parts = [f"世界: {self._campaign_background.world_setting[:1000]}"]
-            parts.append(f"当前场景: {self._campaign_background.initial_situation}")
+            scene = self._campaign_background.current_scene or self._campaign_background.initial_situation
+            parts.append(f"当前场景: {scene}")
             campaign_summary = "\n".join(parts)
 
         return {

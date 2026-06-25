@@ -1,8 +1,8 @@
 import json
+import logging
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
 
 from rpg_chat.types import ActionUnit, CharacterProfile
 from rpg_chat.parser import validate_action_unit_json, ParseError
@@ -769,10 +769,8 @@ def create_llm_gateway() -> LLMGateway:
             kwargs["base_url"] = base_url
         return LLMGateway(OpenAIProvider(**kwargs))
 
-    import sys
-    print(
-        "\n[警告] 未检测到 DEEPSEEK_API_KEY，使用 Mock LLM（仅用于测试）。",
-        "\n请创建 .env 文件并设置 DEEPSEEK_API_KEY=你的key 以连接 AI 服务。\n",
-        file=sys.stderr,
+    logging.warning(
+        "未检测到 DEEPSEEK_API_KEY，使用 Mock LLM（仅用于测试）。"
+        "请创建 .env 文件并设置 DEEPSEEK_API_KEY=你的key 以连接 AI 服务。"
     )
     return LLMGateway(MockLLMProvider())

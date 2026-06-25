@@ -54,6 +54,7 @@ class TestPersistence:
                 ),
                 "npc_bob": CharacterContext(
                     character_id="npc_bob",
+                    fortune="auspicious",
                     action_units=[
                         ActionUnit(
                             character_id="npc_bob",
@@ -115,6 +116,8 @@ class TestPersistence:
         assert loaded.id == "test-session-1"
         assert loaded.name == "测试团"
         assert loaded.mode == "player-present"
+        bob_ctx = loaded.character_contexts["npc_bob"]
+        assert bob_ctx.fortune == "auspicious"
 
     def test_save_creates_backup(self, session, temp_dir):
         filepath = os.path.join(temp_dir, "test.json")
