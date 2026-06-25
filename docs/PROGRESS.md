@@ -7,8 +7,8 @@
 ## 一、当前状态
 
 ### 测试状态
-- **221 passed, 2 pre-existing failures** — 新增测试全部通过
-- 2 个预存失败与本次改动无关：`test_handle_continue_npc`（环境 AU `entered` 字段触发响应顺序偏移）、`test_handle_skill_check`（引用已移除的 `coc` 规则系统，见 ADR-0002）
+- **235 passed, 0 failures** — 全部测试通过
+- 之前 2 个预存失败已修复：`test_handle_continue_npc`（Mock 响应顺序已调整）、`test_handle_skill_check`（已改用 `d20` 规则系统，对齐 ADR-0002）
 - 测试覆盖率：核心领域模型、解析器、骰子、运势、环境、场景、角色存储、对话日志、持久化、预设加载、模组系统、游戏循环、自动模式、玩家确认、检查点系统、玩家空缺模式、检定嵌入叙事、E2E 等
 
 ### 代码质量
@@ -44,7 +44,7 @@
 
 **产出文档**：
 - [CONTEXT.md](file:///d:/RPGchat/CONTEXT.md) — 领域语言与核心概念（已更新）
-- [docs/adr/0001-character-action-units-as-first-class.md](file:///d:/RPGchat/docs/adr/0001-character-action-units-as-first-class.md) — 已有
+- [docs/adr/0001-info-visibility-model.md](file:///d:/RPGchat/docs/adr/0001-info-visibility-model.md) — 已有
 - [docs/adr/0002-unified-d20-system.md](file:///d:/RPGchat/docs/adr/0002-unified-d20-system.md) — 新增
 - [docs/adr/0003-fortune-system-for-npcs.md](file:///d:/RPGchat/docs/adr/0003-fortune-system-for-npcs.md) — 新增
 - [docs/prd-v1.md](file:///d:/RPGchat/docs/prd-v1.md) — 产品需求文档（80 条 User Stories）
@@ -178,7 +178,8 @@
 | 角色系统 | [store.py](file:///d:/RPGchat/src/rpg_chat/store.py) | ✅ |
 | 场景管理 | [scene.py](file:///d:/RPGchat/src/rpg_chat/scene.py) | ✅ |
 | 持久化 | [persistence.py](file:///d:/RPGchat/src/rpg_chat/persistence.py) | ✅ |
-| 预设系统 | [preset_loader.py](file:///d:/RPGchat/src/rpg_chat/preset_loader.py) | ✅（角色+世界观，模组待加） |
+| 预设系统 | [preset_loader.py](file:///d:/RPGchat/src/rpg_chat/preset_loader.py) | ✅ |
+| 技能检定 | [rules.py](file:///d:/RPGchat/src/rpg_chat/rules.py) | ✅ |
 | 玩家确认 | [confirmation.py](file:///d:/RPGchat/src/rpg_chat/confirmation.py) | ✅ |
 | 上下文组装 | [context.py](file:///d:/RPGchat/src/rpg_chat/context.py) | ✅（运势传递已接入） |
 
@@ -188,29 +189,32 @@
 | LLM 集成层 | [llm.py](file:///d:/RPGchat/src/rpg_chat/llm.py) | ✅ |
 | NPC 生成 | [llm.py](file:///d:/RPGchat/src/rpg_chat/llm.py) | ✅ |
 | 判断机制 | [judgment.py](file:///d:/RPGchat/src/rpg_chat/judgment.py) | ✅ |
-| 检查点摘要 | [checkpoint.py](file:///d:/RPGchat/src/rpg_chat/checkpoint.py) | ⚠️ 骨架已在，功能待完善 |
+| 检查点摘要 | [checkpoint.py](file:///d:/RPGchat/src/rpg_chat/checkpoint.py) | ✅ |
+| 自动模式 | [auto_mode.py](file:///d:/RPGchat/src/rpg_chat/auto_mode.py) | ✅ |
 
 ### 协调层
 | 模块 | 文件 | 状态 |
 |------|------|------|
-| 游戏循环 | [game_loop.py](file:///d:/RPGchat/src/rpg_chat/game_loop.py) | ✅（玩家确认、空缺模式待加） |
+| 游戏循环 | [game_loop.py](file:///d:/RPGchat/src/rpg_chat/game_loop.py) | ✅ |
 
 ### 界面层
 | 模块 | 文件 | 状态 |
 |------|------|------|
-| CLI 界面 | [cli.py](file:///d:/RPGchat/cli.py) | ✅（指令待补全） |
+| CLI 界面 | [cli.py](file:///d:/RPGchat/cli.py) | ✅ |
 
 ---
 
-## 五、下一步建议
+## 五、已知缺口
 
-**推荐开发顺序**：
+1. **`{到我}` 指令未实现**：CONTEXT.md 文档化了 `{到我}`（快进到 PC 回合），但 `game_loop.py` 中仅有 `{继续}`（单步推进）。`{到我}` 需连续执行 NPC/环境动作单元直到判断机制选中 PC，计划在后续版本实现。
+2. **AI 生成预设**：PRD 中的 US-55（LLM 根据简短描述生成完整预设/模组）尚未实现。
+3. **`entered` 字段触发完整角色档案生成**：当前即时创建 NPC 仅填充 id/name/personality 基本字段，升级为完整档案生成计划在后续版本实现。
 
-1. **玩家确认原则框架** — 是检查点、场景切换等多个功能的基础设施
-2. **检查点系统完善** — 触发上下文压缩、运势刷新、角色档案更新
-3. **运势系统接入 NPC 生成** — 把运势系统真正用起来
-4. **玩家空缺模式** — 第二核心模式
-5. **检定嵌入叙事** — 提升玩家体验
-6. **模组支持** — 完善预设生态
+## 六、下一步建议
+
+1. **实现 `{到我}` 指令** — 高频需求，提升玩家参与模式的体验
+2. **AI 生成预设功能** — 降低内容创作门槛
+3. **完整角色档案即时生成** — 让新 NPC 入场时拥有完整档案
+4. **异步 LLM 调用** — 减少等待感，支持生成中断
 
 每次迭代遵循 TDD 流程：先写测试 → 写实现 → 重构 → 全部测试通过。

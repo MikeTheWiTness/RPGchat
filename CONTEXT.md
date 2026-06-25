@@ -358,6 +358,35 @@ Agent 支持两种运行模式，在创建游戏时选定：
 2. **世界观预设**：输入简短描述（如「经典西幻世界观」），生成完整的战役背景
 3. **完整模组**：输入简短描述（如「经典西幻，半精灵男主角的冒险故事」），一次性生成世界观 + PC 角色卡 + 初始 NPC + 初始情境，可直接开始游戏
 
+### 骰子引擎 (DiceEngine)
+`dice.py` 中的纯逻辑模块，提供 d20 投骰和技能检定功能。核心方法：
+- `roll_d20(modifier)`: 投 1d20 + 加值，返回 `DiceRollResult`（含表达式、每次投骰值、加值、总值）
+- `check_skill(skill_value, dc)`: 执行一次技能检定，返回 `CheckResult`（含成功/失败、暴击/大失败标记、检定描述）
+
+自然 20 = 暴击（必定成功），自然 1 = 大失败（必定失败）。
+
+### 技能检定处理器 (SkillCheckHandler)
+`rules.py` 中的模块，处理 PC 的 `{检定 技能 [DC]}` 指令。解析指令文本、查找 PC 技能值、调用 `DiceEngine` 执行检定、生成可读的检定结果描述。纯叙事模式下拒绝检定请求。
+
+### 自动模式控制器 (AutoModeController)
+`auto_mode.py` 中的模块，在玩家空缺模式下驱动剧情自动推演。循环调用判断机制 → 生成 NPC/环境动作单元，在遇到待确认事项（检查点提议）时自动暂停，等待玩家确认后继续。
+
+### 确认管理器 (ConfirmationManager)
+`confirmation.py` 中的状态机模块，管理玩家确认流程。支持四类确认请求（场景切换、检查点、时间快进、角色档案重大变更），提供 `propose()` → `confirm()` / `reject()` 的标准状态流转。
+
+### 运势字段 (CharacterContext.fortune)
+`CharacterContext` 上的 `fortune` 字段（默认 `"normal"`），存储角色当前运势等级。由检查点触发刷新（通过 `FortuneSystem.roll_fortune()`），NPC 生成时通过 prompt 注入运势行为倾向描述。详见"运势系统"词条。
+
+### 预设加载器 (PresetLoader)
+`preset_loader.py` 中的模块，负责从 `presets/` 目录加载角色预设、世界观预设和模组。核心函数：
+- `list_characters()` / `load_character_preset(name)`: 列出/加载角色预设
+- `list_worlds()` / `load_world_preset(name)`: 列出/加载世界观预设
+- `list_modules()` / `load_module(name)`: 列出/加载完整模组
+- `build_pc_from_preset(name, name_override, personality_override)`: 将角色预设转换为 PC 档案
+- `list_module_characters(module_name)`: 列出模组内角色
+
+### 语言说明
+本项目的 UI 界面、LLM prompt 模板、预设内容和文档的主要语言为**简体中文**。预设文件名也使用中文（如 `前刑警佐佐木健吾.json`）。代码标识符和注释使用英文。
 ### 游戏机制集成 (Game Mechanics Integration)
 支持两种运行层级，可在创建游戏时选定并在运行时切换：
 
